@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    /* Module system */
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    /* Target */
+    "target": "ES2023",
+    /* Decorators (NestJS) */
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    /* Interop */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    /* Output */
+    "outDir": "./dist",
+    "sourceMap": true,
+    "declaration": true,
+    "removeComments": true,
+    /* Type safety */
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    /* Performance */
+    "incremental": true,
+    "skipLibCheck": true,
+    /* Monorepo / Prisma stability */
+    "baseUrl": "./",
+    "types": [
+      "node",
+      "jest"
+    ],
+    /* Consistency */
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": false,
+    "strictBindCallApply": false
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

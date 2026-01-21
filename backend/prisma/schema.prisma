@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+}
+
+enum LicenseStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role
+  isActive     Boolean  @default(true)
+
+  permissions     AdminPermission?
+  createdLicenses License[]        @relation("Issuer")
+  auditLogs       AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminPermission {
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  canRevokeLicense Boolean @default(false)
+  canViewAuditLog  Boolean @default(false)
+  canManageDevices Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model License {
+  id        String        @id @default(uuid())
+  key       String        @unique
+  status    LicenseStatus @default(ACTIVE)
+  expiresAt DateTime?
+
+  deviceId String? @unique
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  issuerId String
+  issuer   User   @relation("Issuer", fields: [issuerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Device {
+  id          String  @id @default(uuid())
+  fingerprint String  @unique
+  name        String?
+
+  license License?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id       String @id @default(uuid())
+  action   String
+  entity   String
+  entityId String?
+  details  Json?
+
+  actorId String
+  actor   User   @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+}

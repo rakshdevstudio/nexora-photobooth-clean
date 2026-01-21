@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 220 26% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 26% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 26% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Nexora signature: electric-cyan intelligence on deep ink */
+    --primary: 187 92% 52%;
+    --primary-foreground: 220 26% 8%;
+
+    --secondary: 220 22% 14%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 220 18% 16%;
+    --muted-foreground: 215 18% 70%;
+
+    --accent: 270 88% 64%;
+    --accent-foreground: 220 26% 8%;
+
+    --destructive: 0 78% 56%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 18% 18%;
+    --input: 220 18% 18%;
+    --ring: 187 92% 52%;
+
+    --radius: 1.1rem;
+
+    --sidebar-background: 220 26% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 187 92% 52%;
+    --sidebar-primary-foreground: 220 26% 8%;
+    --sidebar-accent: 220 22% 14%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 220 18% 18%;
+    --sidebar-ring: 187 92% 52%;
+
+    /* Typography */
+    --font-sans: "IBM Plex Sans";
+    --font-display: "Space Grotesk";
+
+    /* Effects */
+    --shadow-elevated: 0 18px 60px -20px hsl(var(--primary) / 0.25);
+    --shadow-glow: 0 0 0 1px hsl(var(--primary) / 0.25), 0 18px 60px -30px hsl(var(--primary) / 0.55);
+
+    --gradient-hero: radial-gradient(1000px 700px at 20% 10%, hsl(var(--primary) / 0.35), transparent 60%),
+      radial-gradient(800px 600px at 80% 25%, hsl(var(--accent) / 0.25), transparent 55%),
+      radial-gradient(700px 500px at 50% 90%, hsl(50 100% 62% / 0.10), transparent 60%);
+
+    --texture-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+  }
+
+  .dark {
+    /* Keep parity; same direction, slightly brighter cards */
+    --background: 220 26% 6%;
+    --foreground: 210 40% 98%;
+    --card: 220 26% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 26% 9%;
+    --popover-foreground: 210 40% 98%;
+    --border: 220 18% 18%;
+    --input: 220 18% 18%;
+    --ring: 187 92% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .nexora-surface {
+    background-image: var(--gradient-hero), var(--texture-noise);
+    background-size: auto, 240px 240px;
+    background-repeat: no-repeat, repeat;
+  }
+
+  .nexora-spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+  .nexora-spotlight::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(800px 500px at var(--mx, 50%) var(--my, 20%), hsl(var(--primary) / 0.35), transparent 60%);
+    filter: blur(10px);
+    opacity: 0.9;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nexora-spotlight::before {
+      opacity: 0.6;
+    }
+  }
+
+  /* Touch-target audit mode (operator-only) */
+  .touch-audit button,
+  .touch-audit a[href],
+  .touch-audit input,
+  .touch-audit select,
+  .touch-audit textarea,
+  .touch-audit [role="button"],
+  .touch-audit [role="menuitem"],
+  .touch-audit [data-radix-collection-item] {
+    outline: 2px solid hsl(var(--ring) / 0.75);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px hsl(var(--ring) / 0.12);
+  }
+
+  .touch-audit [data-touch-too-small="true"] {
+    outline-color: hsl(var(--destructive) / 0.9);
+    box-shadow: 0 0 0 4px hsl(var(--destructive) / 0.14);
+  }
+}
