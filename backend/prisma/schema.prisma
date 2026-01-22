@@ -51,6 +51,7 @@ model License {
   key       String        @unique
   status    LicenseStatus @default(ACTIVE)
   expiresAt DateTime?
+  isArchived Boolean      @default(false)
 
   deviceId String? @unique
   device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
@@ -66,6 +67,7 @@ model Device {
   id          String  @id @default(uuid())
   fingerprint String  @unique
   name        String?
+  isArchived  Boolean @default(false)
 
   license License?
 
@@ -79,6 +81,7 @@ model AuditLog {
   entity   String
   entityId String?
   details  Json?
+  isArchived Boolean @default(false)
 
   actorId String
   actor   User   @relation(fields: [actorId], references: [id], onDelete: Restrict)
