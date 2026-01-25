@@ -14,6 +14,9 @@ import IdleCopyEditorCard from "@/booth/admin/IdleCopyEditorCard";
 import { clearAdminAuthed } from "@/booth/admin/adminAuth";
 import { isTouchAuditEnabled, setTouchAuditEnabled } from "@/booth/admin/touchAudit";
 import { clearOrderHistory, loadOrderHistory } from "@/booth/storage/orderHistory";
+import { toast } from "sonner";
+import { getAllJobs, deleteJob, updateJobStatus, type PrintJob } from "@/booth/printQueue/printQueueService";
+import { RefreshCw, Trash2 } from "lucide-react";
 
 function formatCents(cents: number, currency: AdminSettings["currency"]) {
   // Admin-facing helper; kiosk display uses formatMoney.
@@ -30,6 +33,60 @@ export default function AdminPanel() {
   const [settings, setSettings] = useState<AdminSettings>(() => loadAdminSettings());
   const [touchAudit, setTouchAudit] = useState(() => isTouchAuditEnabled());
   const [orders, setOrders] = useState<Awaited<ReturnType<typeof loadOrderHistory>>>([]);
+  const [upiQr, setUpiQr] = useState<string | null>(() => localStorage.getItem("upi_qr_image"));
+
+  // Minimal type for printers since we don't have Electron global types here
+  type PrinterInfo = { name: string; description?: string; status?: number; isDefault?: boolean };
+  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState<string>(() => localStorage.getItem("nexora.booth.printer") ?? "");
+  const [printQueue, setPrintQueue] = useState<PrintJob[]>([]);
+
+  useEffect(() => {
+    if (window.electron) {
+      window.electron.getPrinters().then((list: PrinterInfo[]) => setPrinters(list)).catch(console.error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void getAllJobs().then(setPrintQueue);
+  }, []);
+
+  const refreshQueue = () => getAllJobs().then(setPrintQueue);
+
+
+  const handleUpiQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Basic validation
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image too large. Please use an image under 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === "string") {
+        setUpiQr(result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const applyChanges = () => {
+    if (upiQr) {
+      localStorage.setItem("upi_qr_image", upiQr);
+    } else {
+      localStorage.removeItem("upi_qr_image");
+    }
+    if (selectedPrinter) {
+      localStorage.setItem("nexora.booth.printer", selectedPrinter);
+    } else {
+      localStorage.removeItem("nexora.booth.printer");
+    }
+    applyAdminSettings(settings);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -81,7 +138,7 @@ export default function AdminPanel() {
             >
               Logout
             </Button>
-            <Button className="rounded-xl" variant="kiosk" onClick={() => applyAdminSettings(settings)}>
+            <Button className="rounded-xl" variant="kiosk" onClick={applyChanges}>
               Apply to kiosk
             </Button>
             <Button asChild variant="outline" className="rounded-xl">
@@ -307,6 +364,132 @@ export default function AdminPanel() {
                 </div>
               </Card>
             </div>
+
+            <div className="mt-4">
+              <Card className="border bg-card/60 p-5 shadow-elevated">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">UPI QR Code</div>
+                    <p className="mt-1 text-xs text-muted-foreground">Upload a custom QR code for UPI payments.</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      id="upi-qr-upload"
+                      className="hidden"
+                      accept="image/png, image/jpeg"
+                      onChange={handleUpiQrUpload}
+                    />
+                    <Button variant="outline" size="sm" asChild className="rounded-xl cursor-pointer">
+                      <label htmlFor="upi-qr-upload">Upload QR</label>
+                    </Button>
+                    {upiQr && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={() => setUpiQr(null)}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {upiQr && (
+                  <div className="mt-6 flex justify-center rounded-xl border border-white/5 bg-black/20 p-4">
+                    <div className="relative aspect-square w-48 overflow-hidden rounded-lg bg-white">
+                      <img src={upiQr} alt="UPI QR Preview" className="h-full w-full object-contain" />
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+          </TabsContent>
+
+          <TabsContent value="print_queue" className="mt-4">
+            <Card className="border bg-card/60 p-5 shadow-elevated">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">Print Queue</div>
+                  <p className="mt-1 text-xs text-muted-foreground">Monitor and retry pending print jobs.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={refreshQueue}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+                </Button>
+              </div>
+
+              <div className="mt-4 overflow-auto rounded-xl border">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-secondary/20 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2">ID</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Retries</th>
+                      <th className="px-3 py-2">Last Error</th>
+                      <th className="px-3 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printQueue.length ? (
+                      printQueue.map((job) => (
+                        <tr key={job.id} className="border-t">
+                          <td className="px-3 py-2 whitespace-nowrap">{new Date(job.createdAt).toLocaleString()}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{job.id.slice(0, 8)}...</td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${job.status === "PRINTED" ? "bg-green-500/10 text-green-500" :
+                              job.status === "PENDING" ? "bg-amber-500/10 text-amber-500" :
+                                "bg-red-500/10 text-red-500"
+                              }`}>
+                              {job.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{job.retryCount}</td>
+                          <td className="px-3 py-2 text-xs text-red-400 max-w-[200px] truncate">{job.lastError || "-"}</td>
+                          <td className="px-3 py-2 flex items-center gap-2">
+                            {job.status !== "PRINTED" && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 hover:text-primary"
+                                onClick={async () => {
+                                  await updateJobStatus(job.id, "PENDING"); // Reset to pending triggers worker
+                                  toast.success("Job requeued for retry");
+                                  refreshQueue();
+                                }}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:text-destructive"
+                              onClick={async () => {
+                                if (!confirm("Delete this print job?")) return;
+                                await deleteJob(job.id);
+                                refreshQueue();
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="px-3 py-6 text-sm text-muted-foreground" colSpan={6}>
+                          Queue is empty.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </TabsContent>
 
           <TabsContent value="orders" className="mt-4">
@@ -368,6 +551,30 @@ export default function AdminPanel() {
 
           <TabsContent value="kiosk" className="mt-4">
             <div className="grid gap-4 md:grid-cols-2">
+              {/* Printer Selection Card (Electron Only) */}
+              {window.electron ? (
+                <Card className="border bg-card/60 p-5 shadow-elevated">
+                  <div className="text-sm font-medium">Printer</div>
+                  <p className="mt-1 text-xs text-muted-foreground">Select the default printer for silent printing.</p>
+                  <div className="mt-4">
+                    <Select
+                      value={selectedPrinter}
+                      onValueChange={setSelectedPrinter}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="System Default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">System Default</SelectItem>
+                        {printers.map((p) => (
+                          <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </Card>
+              ) : null}
+
               <Card className="border bg-card/60 p-5 shadow-elevated">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -434,13 +641,39 @@ export default function AdminPanel() {
                 </div>
               </Card>
 
+              <Card className="border bg-card/60 p-5 shadow-elevated">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Privacy Mode</div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Auto-delete photos after 15 minutes (Strict) or 24 hours (Default).
+                    </p>
+                    <div className="mt-2 text-xs text-amber-500/80 font-medium">
+                      ⚠️ Guest photos auto-delete after 15 minutes.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">Strict Mode</Label>
+                    <Switch
+                      checked={settings.kiosk.privacyMode}
+                      onCheckedChange={(checked) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          kiosk: { ...prev.kiosk, privacyMode: checked },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </Card>
+
               <div className="md:col-span-2">
                 <IdleCopyEditorCard />
               </div>
             </div>
           </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+        </Tabs >
+      </div >
+    </div >
   );
 }

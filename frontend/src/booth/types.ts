@@ -58,6 +58,7 @@ export type OrderDraft = {
   paymentMethod?: PaymentMethod;
   paymentStatus: PaymentStatus;
   paymentRef?: string;
+  downloadUrl?: string;
 
   cameraSource?: CameraSourceId;
 
@@ -96,6 +97,8 @@ export type AdminSettings = {
     requireTemplateSelection: boolean;
     /** Countdown shown before each capture. Per-device setting. */
     photoCaptureCountdownSeconds: number;
+    /** If true, photos auto-delete after 15 mins. If false, 24 hours. */
+    privacyMode: boolean;
   };
   payments: {
     razorpay: {

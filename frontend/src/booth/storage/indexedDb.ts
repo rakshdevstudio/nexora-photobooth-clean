@@ -3,11 +3,12 @@
 export type IdKey = IDBValidKey;
 
 const DB_NAME = "nexora.booth";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORE_KV = "kv";
 const STORE_ORDERS = "orders";
 const STORE_PRINT_LOGS = "print_logs";
+const STORE_PRINT_QUEUE = "print_queue";
 
 type KvRow = { key: string; value: unknown };
 
@@ -27,6 +28,11 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_PRINT_LOGS)) {
         const store = db.createObjectStore(STORE_PRINT_LOGS, { keyPath: "id" });
+        store.createIndex("createdAt", "createdAt", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_PRINT_QUEUE)) {
+        const store = db.createObjectStore(STORE_PRINT_QUEUE, { keyPath: "id" });
+        store.createIndex("status", "status", { unique: false });
         store.createIndex("createdAt", "createdAt", { unique: false });
       }
     };
@@ -103,6 +109,13 @@ export async function idbClear(storeName: string): Promise<void> {
   await txDone(tx);
 }
 
+export async function idbDeleteRow(storeName: string, id: IDBValidKey): Promise<void> {
+  const db = await getDb();
+  const tx = db.transaction(storeName, "readwrite");
+  tx.objectStore(storeName).delete(id);
+  await txDone(tx);
+}
+
 export async function idbDeleteOldest(storeName: string, keepLatest: number): Promise<void> {
   if (keepLatest <= 0) return;
   const db = await getDb();
@@ -119,4 +132,5 @@ export const IDB_STORES = {
   kv: STORE_KV,
   orders: STORE_ORDERS,
   printLogs: STORE_PRINT_LOGS,
+  printQueue: STORE_PRINT_QUEUE,
 } as const;

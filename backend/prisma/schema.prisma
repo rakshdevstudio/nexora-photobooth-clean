@@ -55,6 +55,7 @@ model License {
 
   deviceId String? @unique
   device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  mismatchDetectedAt DateTime?
 
   issuerId String
   issuer   User   @relation("Issuer", fields: [issuerId], references: [id])

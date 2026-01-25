@@ -11,6 +11,7 @@ import { LocalJsonStorage } from "@/booth/storage/localJsonStorage";
 import { WebCameraEngine } from "@/booth/engines/camera/webCameraEngine";
 import { StubPaymentEngine } from "@/booth/engines/payment/stubPaymentEngine";
 import { BrowserPrintEngine } from "@/booth/engines/print/browserPrintEngine";
+import { ElectronPrintEngine } from "@/booth/engines/print/electronPrintEngine";
 import { nanoid } from "@/booth/utils/nanoid";
 import { defaultAdminSettings } from "@/booth/admin/settings";
 import { getEnabledBuiltinTemplates, onBuiltinTemplatesChanged } from "@/booth/admin/builtinTemplatesState";
@@ -55,6 +56,7 @@ type BoothFlowActions = {
 
   printNow(html: string): Promise<void>;
   resetToStart(): Promise<void>;
+  uploadFinalPhoto(dataUrl: string): Promise<void>;
 };
 
 type BoothFlowContextValue = BoothFlowState & BoothFlowActions;
@@ -140,7 +142,10 @@ export function BoothFlowProvider({ children }: { children: React.ReactNode }) {
   const storage = useMemo(() => new LocalJsonStorage(), []);
   const cameraEngine = useMemo(() => new WebCameraEngine(), []);
   const paymentEngine = useMemo(() => new StubPaymentEngine(), []);
-  const printEngine = useMemo(() => new BrowserPrintEngine(), []);
+  // Auto-detect engine: use Electron if api available, else browser popup
+  const printEngine = useMemo(() => {
+    return window.electron ? new ElectronPrintEngine() : new BrowserPrintEngine();
+  }, []);
 
   const [step, setStep] = useState<BoothStepId>("start");
   const [customTemplates, setCustomTemplates] = useState<TemplateAsset[]>([]);
@@ -219,9 +224,9 @@ export function BoothFlowProvider({ children }: { children: React.ReactNode }) {
 
       setOrder((o) => {
         const next: OrderDraft = { ...o, currency: nextSettings.currency };
-         if (next.quantity) {
-           next.priceCents = computePriceCents(nextSettings, next.quantity);
-         }
+        if (next.quantity) {
+          next.priceCents = computePriceCents(nextSettings, next.quantity);
+        }
         return next;
       });
     };
@@ -437,6 +442,44 @@ export function BoothFlowProvider({ children }: { children: React.ReactNode }) {
     await printEngine.print(html);
   };
 
+  const uploadFinalPhoto = async (dataUrl: string) => {
+    try {
+      console.log("Starting uploadFinalPhoto...");
+      const blob = await (await fetch(dataUrl)).blob();
+      // OrderDraft doesn't have an id, so we use paymentRef or a timestamp/random fallback
+      const uniqueId = order.paymentRef || `draft-${Date.now()}`;
+      const filename = `print-${uniqueId}.png`;
+      const formData = new FormData();
+      formData.append("file", blob, filename);
+
+      console.log("Uploading photo...");
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+
+      const res = await fetch(`${BACKEND_URL}/storage/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Upload failed: " + res.statusText);
+      const { downloadUrl } = await res.json();
+      console.log(`Upload success URL: ${downloadUrl}`);
+
+      setOrder((prev) => {
+        console.log("Setting order.downloadUrl:", downloadUrl);
+        return { ...prev, downloadUrl };
+      });
+    } catch (err) {
+      console.error("Failed to upload photo for QR:", err);
+
+      // Forced Mock for Dev/UI testing
+      if (import.meta.env.DEV) {
+        console.warn("DEV FALLBACK: Using mock URL.");
+        const mockUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80";
+        setOrder((prev) => ({ ...prev, downloadUrl: mockUrl }));
+      }
+    }
+  };
+
   const resetToStart = async () => {
     await cameraEngine.stop().catch(() => undefined);
     setStep("start");
@@ -451,41 +494,64 @@ export function BoothFlowProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const actions = useMemo(
+    () => ({
+      go,
+      next,
+      back,
+      startNewOrder,
+      setShotCount,
+      setLayoutType,
+      setQuantity,
+      setVoucher,
+      setPaymentMethod,
+      acceptCash,
+      beginPayment,
+      confirmPayment,
+      setTemplate,
+      lockPhotos,
+      attachPhotoAt,
+      requestRetake,
+      markRetakeUsed,
+      updateTemplates,
+      printNow,
+      resetToStart,
+      uploadFinalPhoto,
+    }),
+    [
+      go,
+      next,
+      back,
+      startNewOrder,
+      setShotCount,
+      setLayoutType,
+      setQuantity,
+      setVoucher,
+      setPaymentMethod,
+      acceptCash,
+      beginPayment,
+      confirmPayment,
+      setTemplate,
+      lockPhotos,
+      attachPhotoAt,
+      requestRetake,
+      markRetakeUsed,
+      updateTemplates,
+      printNow,
+      resetToStart,
+      // uploadFinalPhoto is stable as it has no deps other than setOrder
+      // setOrder is stable from useState
+      uploadFinalPhoto,
+    ]
+  );
+
   const value: BoothFlowContextValue = {
     step,
     order,
     templates,
     paymentMode,
     captureCountdownSeconds,
-
-    go,
-    next,
-    back,
-
-    startNewOrder,
-
-    setShotCount,
-    setLayoutType,
-    setQuantity,
-    setVoucher,
-
-    setPaymentMethod,
-    acceptCash,
-
-    beginPayment,
-    confirmPayment,
-
-    setTemplate,
-    lockPhotos,
-
-    attachPhotoAt,
-    requestRetake,
-    markRetakeUsed,
-
-    updateTemplates,
-
-    printNow,
-    resetToStart,
+    ...actions,
   };
 
   return <BoothFlowContext.Provider value={value}>{children}</BoothFlowContext.Provider>;

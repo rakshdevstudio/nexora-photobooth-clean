@@ -44,6 +44,13 @@ export class LicenseController {
         return this.licenseService.revokeLicense(id, req.user.userId, req.user.role);
     }
 
+    @Post(':id/rebind-device')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPER_ADMIN)
+    rebind(@Param('id') id: string, @Request() req) {
+        return this.licenseService.rebindDevice(id, req.user.userId, req.user.role);
+    }
+
     @Post('validate')
     @UsePipes(new ValidationPipe({ whitelist: true }))
     validate(@Body() validateLicenseDto: ValidateLicenseDto) {

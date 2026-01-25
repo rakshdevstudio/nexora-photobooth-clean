@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Key, Copy, Eye, EyeOff, Trash2, Monitor, AlertTriangle, Plus } from 'lucide-react';
+import { Key, Copy, Eye, EyeOff, Trash2, Monitor, AlertTriangle, Plus, RefreshCw } from 'lucide-react';
 
 interface License {
     id: string;
@@ -21,6 +21,7 @@ export default function AdminLicenses() {
     const [loading, setLoading] = useState(true);
     const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
     const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
+    const [rebindConfirm, setRebindConfirm] = useState<string | null>(null);
 
     const canRevoke = user?.role === 'SUPER_ADMIN' || user?.permissions?.canRevokeLicense;
 
@@ -74,6 +75,24 @@ export default function AdminLicenses() {
             toast.error('Revoke failed');
         } finally {
             setRevokeConfirm(null);
+        }
+    };
+
+    const confirmRebind = async () => {
+        if (!rebindConfirm) return;
+        try {
+            await fetch(`/licenses/${rebindConfirm}/rebind-device`, {
+                method: 'POST',
+                headers: {
+                    ...AdminAuthService.getAuthHeader() as any,
+                }
+            });
+            toast.success('Device binding cleared');
+            fetchLicenses();
+        } catch (e) {
+            toast.error('Rebind failed');
+        } finally {
+            setRebindConfirm(null);
         }
     };
 
@@ -155,6 +174,17 @@ export default function AdminLicenses() {
                                             <Trash2 className="h-4 w-4 mr-2" /> Revoke
                                         </Button>
                                     )}
+
+                                    {lic.status === 'ACTIVE' && lic.deviceId && user?.role === 'SUPER_ADMIN' && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-amber-400 border-amber-900/40 hover:bg-amber-500/10 hover:border-amber-500/50 hover:text-amber-300 transition-all"
+                                            onClick={() => setRebindConfirm(lic.id)}
+                                        >
+                                            <RefreshCw className="h-4 w-4 mr-2" /> Rebind
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -182,6 +212,26 @@ export default function AdminLicenses() {
                         <AlertDialogCancel className="bg-transparent border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={confirmRevoke} className="bg-red-600 hover:bg-red-700">
                             Yes, Revoke License
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={!!rebindConfirm} onOpenChange={(open) => !open && setRebindConfirm(null)}>
+                <AlertDialogContent className="admin-card border-none text-white max-w-md">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-amber-500">
+                            <RefreshCw className="h-5 w-5" /> Rebind Device?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-gray-400">
+                            This will clear the device binding for this license. The next device to use this license will bind to it.
+                            This is useful if a kiosk hardware was replaced.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-transparent border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmRebind} className="bg-amber-600 hover:bg-amber-700 text-white">
+                            Yes, Clear Binding
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

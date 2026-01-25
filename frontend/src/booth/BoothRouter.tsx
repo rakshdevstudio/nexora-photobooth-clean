@@ -16,46 +16,37 @@ import StepFinalReview from "@/booth/steps/StepFinalReview";
 import StepFinalPreview from "@/booth/steps/StepFinalPreview";
 import StepPrint from "@/booth/steps/StepPrint";
 import StepThankYou from "@/booth/steps/StepThankYou";
+import PrintQueueIndicator from "@/booth/components/PrintQueueIndicator";
 
 export default function BoothRouter() {
   const { step } = useBoothFlow();
 
+  let content;
   switch (step) {
-    case "start":
-      return <StepStart />;
-    case "shots":
-      return <StepShots />;
-    case "layout_select":
-      return <StepLayoutTypeSelect />;
-    case "quantity":
-      return <StepQuantity />;
-    case "summary":
-      return <StepSummary />;
-    case "payment_method":
-      return <StepPaymentMethod />;
-    case "payment_loading":
-      return <StepPaymentLoading />;
-    case "payment_gateway":
-      return <StepPaymentGateway />;
-    case "payment_confirmation":
-      return <StepPaymentConfirmation />;
-    case "template_select":
-      return <StepTemplateSelect />;
-    case "camera_select":
-      return <StepCameraSelect />;
-    case "capture":
-      return <StepCapture />;
-    case "photo_review":
-      return <StepPhotoReview />;
-    case "final_review":
-      return <StepFinalReview />;
-    case "final_preview":
-      return <StepFinalPreview />;
-    case "print":
-      return <StepPrint />;
-    case "thank_you":
-      return <StepThankYou />;
-    default:
-      return <StepStart />;
+    case "start": content = <StepStart />; break;
+    case "shots": content = <StepShots />; break;
+    case "layout_select": content = <StepLayoutTypeSelect />; break;
+    case "quantity": content = <StepQuantity />; break;
+    case "summary": content = <StepSummary />; break;
+    case "payment_method": content = <StepPaymentMethod />; break;
+    case "payment_loading": content = <StepPaymentLoading />; break;
+    case "payment_gateway": content = <StepPaymentGateway />; break;
+    case "payment_confirmation": content = <StepPaymentConfirmation />; break;
+    case "template_select": content = <StepTemplateSelect />; break;
+    case "camera_select": content = <StepCameraSelect />; break;
+    case "capture": content = <StepCapture />; break;
+    case "photo_review": content = <StepPhotoReview />; break;
+    case "final_review": content = <StepFinalReview />; break;
+    case "final_preview": content = <StepFinalPreview />; break;
+    case "print": content = <StepPrint />; break;
+    case "thank_you": content = <StepThankYou />; break;
+    default: content = <StepStart />; break;
   }
+
+  return (
+    <>
+      {content}
+      <PrintQueueIndicator />
+    </>
+  );
 }

@@ -24,6 +24,7 @@ const settingsSchema = z
     kiosk: z.object({
       requireTemplateSelection: z.boolean(),
       photoCaptureCountdownSeconds: z.number().int().min(3).max(15),
+      privacyMode: z.boolean(),
     }),
     payments: z.object({
       razorpay: z.object({
@@ -51,7 +52,7 @@ export function defaultAdminSettings(): AdminSettings {
     currency: "INR",
     paymentMode: "cash",
     strips: [base.strip],
-    kiosk: { requireTemplateSelection: true, photoCaptureCountdownSeconds: 10 },
+    kiosk: { requireTemplateSelection: true, photoCaptureCountdownSeconds: 10, privacyMode: false },
     payments: {
       razorpay: {
         enabled: false,

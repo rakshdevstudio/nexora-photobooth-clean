@@ -126,6 +126,7 @@ export class LicenseService {
         return updatedLicense;
     }
 
+
     async validateLicense(dto: ValidateLicenseDto) {
         const license = await this.prisma.license.findUnique({
             where: { key: dto.licenseKey },
@@ -141,23 +142,77 @@ export class LicenseService {
         }
 
         if (license.expiresAt && new Date() > license.expiresAt) {
-            // Auto-update status to EXPIRED? User didn't request this, but it's good practice. 
-            // For now, just reject validation.
             throw new ForbiddenException('License expired');
         }
 
+        // Device Validation Logic
         if (license.device) {
-            if (license.device.fingerprint !== dto.deviceFingerprint) {
-                throw new ForbiddenException('License bound to another device');
+            // 1. Check strict match
+            if (license.device.fingerprint === dto.deviceFingerprint) {
+                // If we recovered from a mismatch (switched back to valid device), clear the warning?
+                if (license.mismatchDetectedAt) {
+                    await this.prisma.license.update({
+                        where: { id: license.id },
+                        data: { mismatchDetectedAt: null }
+                    });
+                }
+                return { valid: true, licenseId: license.id, expiresAt: license.expiresAt };
             }
-            // Valid and matches
-            return { valid: true, licenseId: license.id, expiresAt: license.expiresAt };
+
+            // 2. Mismatch Case - GRACE PERIOD LOGIC
+            const now = new Date();
+            let mismatchStart = license.mismatchDetectedAt;
+
+            if (!mismatchStart) {
+                // Start Grace Period
+                mismatchStart = now;
+                await this.prisma.license.update({
+                    where: { id: license.id },
+                    data: { mismatchDetectedAt: mismatchStart }
+                });
+            }
+
+            const diffTime = Math.abs(now.getTime() - mismatchStart.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const GRACE_DAYS = 7;
+            const isGrace = diffDays <= GRACE_DAYS;
+
+            // Log Mismatch in Audit Log
+            await this.prisma.auditLog.create({
+                data: {
+                    action: isGrace ? 'LICENSE_MISMATCH_GRACE' : 'LICENSE_MISMATCH_BLOCKED',
+                    entity: 'License',
+                    entityId: license.id,
+                    actorId: license.issuerId,
+                    details: {
+                        expected: license.device.fingerprint,
+                        received: dto.deviceFingerprint,
+                        graceDay: diffDays,
+                        allowed: isGrace
+                    },
+                },
+            });
+
+            if (isGrace) {
+                // Soft Fail / Warn
+                // We return valid but maybe we should flag it? 
+                // The frontend expects { valid: boolean }.
+                console.warn(`License mismatch allowed (Day ${diffDays}/${GRACE_DAYS})`);
+                return { valid: true, licenseId: license.id, expiresAt: license.expiresAt, warning: 'Device Mismatch - Grace Period' };
+            } else {
+                // Hard Lock
+                throw new ForbiddenException('DEVICE_MISMATCH');
+            }
         } else {
-            // Unbound - bind it now
+            // 3. First time Bind
             let device = await this.prisma.device.findUnique({ where: { fingerprint: dto.deviceFingerprint } });
+
             if (!device) {
                 device = await this.prisma.device.create({
-                    data: { fingerprint: dto.deviceFingerprint }
+                    data: {
+                        fingerprint: dto.deviceFingerprint,
+                        name: `Device-${dto.deviceFingerprint.substring(0, 6)}`
+                    }
                 });
             }
 
@@ -166,14 +221,51 @@ export class LicenseService {
                 data: { deviceId: device.id }
             });
 
-            // Log this binding as a system action or attribute to the license user? 
-            // Since this is a public endpoint, we don't have an actorId. We can skip audit log or use a system ID. 
-            // User requirements requested audit log for "Assign License" API, but "Validate License" behavior says "If unbound -> bind to device".
-            // I will log it with a generic system placeholder if possible, or omit actorId if nullable. 
-            // AuditLog.actorId is NOT nullable. I will associate it with the issuer for now or just skip logging to avoid breaking constraints.
-            // Given constraints and "No explanations", I will skip explicit AuditLog here to keep it simple and safe.
+            await this.prisma.auditLog.create({
+                data: {
+                    action: 'LICENSE_BOUND',
+                    entity: 'License',
+                    entityId: license.id,
+                    actorId: license.issuerId,
+                    details: {
+                        deviceId: device.id,
+                        fingerprint: device.fingerprint
+                    },
+                },
+            });
 
             return { valid: true, licenseId: license.id, expiresAt: license.expiresAt, bound: true };
         }
+    }
+
+    async rebindDevice(id: string, actorId: string, actorRole: Role) {
+        if (actorRole !== Role.SUPER_ADMIN) {
+            throw new ForbiddenException('Only Super Admin can rebind devices');
+        }
+
+        const license = await this.prisma.license.findUnique({ where: { id } });
+        if (!license) throw new NotFoundException('License not found');
+
+        await this.prisma.license.update({
+            where: { id },
+            data: {
+                deviceId: null,
+                mismatchDetectedAt: null
+            }
+        });
+
+        await this.prisma.auditLog.create({
+            data: {
+                action: 'LICENSE_REBOUND',
+                entity: 'License',
+                entityId: license.id,
+                actorId,
+                details: {
+                    message: 'Device binding cleared by admin'
+                },
+            },
+        });
+
+        return { success: true };
     }
 }

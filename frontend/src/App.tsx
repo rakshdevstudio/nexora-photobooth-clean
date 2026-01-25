@@ -16,6 +16,8 @@ import AdminAdmins from "./admin/pages/AdminAdmins";
 import AdminLicenses from "./admin/pages/AdminLicenses";
 import AdminAuditLogs from "./admin/pages/AdminAuditLogs";
 import AdminMaintenance from "./admin/pages/AdminMaintenance";
+import PrintLayout from "./pages/PrintLayout";
+import { PrintQueueProvider } from "./booth/printQueue/PrintQueueContext";
 
 type RequireAdminProps = {
   children: React.ReactNode;
@@ -31,39 +33,42 @@ const App = () => (
     <TouchAuditInit />
     <LicenseProvider>
       <AdminAuthProvider>
-        <Routes>
-          <Route path="/" element={<Index />} />
+        <PrintQueueProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
 
-          {/* Existing Local Admin Routes (Operator) */}
-          <Route
-            path="/admin"
-            element={
-              <RequireAdmin>
-                <AdminPanel />
-              </RequireAdmin>
-            }
-          />
-          <Route
-            path="/admin/templates"
-            element={
-              <RequireAdmin>
-                <AdminTemplates />
-              </RequireAdmin>
-            }
-          />
+            {/* Existing Local Admin Routes (Operator) */}
+            <Route
+              path="/admin"
+              element={
+                <RequireAdmin>
+                  <AdminPanel />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/templates"
+              element={
+                <RequireAdmin>
+                  <AdminTemplates />
+                </RequireAdmin>
+              }
+            />
 
-          {/* New Super Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route element={<AdminLayout />}>
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/admins" element={<AdminAdmins />} />
-            <Route path="/admin/licenses" element={<AdminLicenses />} />
-            <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
-            <Route path="/admin/maintenance" element={<AdminMaintenance />} />
-          </Route>
+            {/* New Super Admin Routes */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route element={<AdminLayout />}>
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/admins" element={<AdminAdmins />} />
+              <Route path="/admin/licenses" element={<AdminLicenses />} />
+              <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
+              <Route path="/admin/maintenance" element={<AdminMaintenance />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="*" element={<NotFound />} />
+            <Route path="/print-layout" element={<PrintLayout />} />
+          </Routes>
+        </PrintQueueProvider>
       </AdminAuthProvider>
     </LicenseProvider>
   </>
