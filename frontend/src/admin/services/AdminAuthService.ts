@@ -54,7 +54,7 @@ export class AdminAuthService {
             const decoded = JSON.parse(jsonPayload);
             // Map JWT payload to AdminUser
             return {
-                userId: decoded.sub,
+                id: decoded.sub,
                 email: decoded.username, // NestJS JWT strategy maps email to username usually, or we need to check backend
                 role: decoded.role
             };
