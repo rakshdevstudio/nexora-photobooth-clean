@@ -30,7 +30,8 @@ export default function AdminAdmins() {
 
     const fetchAdmins = async () => {
         try {
-            const res = await fetch('/admins', {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            const res = await fetch(`${API_URL}/admins`, {
                 headers: AdminAuthService.getAuthHeader()
             });
             if (!res.ok) throw new Error('Failed to fetch admins');
@@ -45,7 +46,8 @@ export default function AdminAdmins() {
 
     const createAdmin = async () => {
         try {
-            const res = await fetch('/admins', {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            const res = await fetch(`${API_URL}/admins`, {
                 method: 'POST',
                 headers: {
                     ...AdminAuthService.getAuthHeader() as any,
@@ -66,7 +68,8 @@ export default function AdminAdmins() {
     const confirmStatusChange = async () => {
         if (!statusConfirm) return;
         try {
-            await fetch(`/admins/${statusConfirm.id}/status`, {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            await fetch(`${API_URL}/admins/${statusConfirm.id}/status`, {
                 method: 'PATCH',
                 headers: {
                     ...AdminAuthService.getAuthHeader() as any,
@@ -85,7 +88,8 @@ export default function AdminAdmins() {
 
     const updatePermission = async (id: string, perm: string, val: boolean) => {
         try {
-            await fetch(`/admins/${id}/permissions`, {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            await fetch(`${API_URL}/admins/${id}/permissions`, {
                 method: 'PATCH',
                 headers: {
                     ...AdminAuthService.getAuthHeader() as any,

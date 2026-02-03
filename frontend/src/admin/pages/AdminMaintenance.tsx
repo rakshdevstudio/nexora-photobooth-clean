@@ -76,10 +76,11 @@ export default function AdminMaintenance() {
         setLoading(type);
         setConfirmAction(null);
 
+        const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
         let endpoint = '';
-        if (type === 'LICENSES') endpoint = '/maintenance/licenses/cleanup';
-        if (type === 'AUDIT_LOGS') endpoint = '/maintenance/audit-logs/archive';
-        if (type === 'DEVICES') endpoint = '/maintenance/devices/cleanup';
+        if (type === 'LICENSES') endpoint = `${API_URL}/maintenance/licenses/cleanup`;
+        if (type === 'AUDIT_LOGS') endpoint = `${API_URL}/maintenance/audit-logs/archive`;
+        if (type === 'DEVICES') endpoint = `${API_URL}/maintenance/devices/cleanup`;
 
         try {
             const res = await fetch(endpoint, {

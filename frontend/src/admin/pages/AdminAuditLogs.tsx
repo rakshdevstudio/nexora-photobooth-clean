@@ -30,7 +30,8 @@ export default function AdminAuditLogs() {
 
     const fetchLogs = async () => {
         try {
-            const res = await fetch('/audit-logs', {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            const res = await fetch(`${API_URL}/audit-logs`, {
                 headers: AdminAuthService.getAuthHeader()
             });
             if (!res.ok) throw new Error('Failed to fetch logs');

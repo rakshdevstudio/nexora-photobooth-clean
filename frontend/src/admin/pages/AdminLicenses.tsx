@@ -27,7 +27,8 @@ export default function AdminLicenses() {
 
     const fetchLicenses = async () => {
         try {
-            const res = await fetch('/licenses', {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            const res = await fetch(`${API_URL}/licenses`, {
                 headers: AdminAuthService.getAuthHeader()
             });
             if (!res.ok) throw new Error('Failed to fetch licenses');
@@ -44,7 +45,8 @@ export default function AdminLicenses() {
 
     const generateLicense = async () => {
         try {
-            const res = await fetch('/licenses', {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            const res = await fetch(`${API_URL}/licenses`, {
                 method: 'POST',
                 headers: {
                     ...AdminAuthService.getAuthHeader() as any,
@@ -63,7 +65,8 @@ export default function AdminLicenses() {
     const confirmRevoke = async () => {
         if (!revokeConfirm) return;
         try {
-            await fetch(`/licenses/${revokeConfirm}/revoke`, {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            await fetch(`${API_URL}/licenses/${revokeConfirm}/revoke`, {
                 method: 'PATCH',
                 headers: {
                     ...AdminAuthService.getAuthHeader() as any,
@@ -81,7 +84,8 @@ export default function AdminLicenses() {
     const confirmRebind = async () => {
         if (!rebindConfirm) return;
         try {
-            await fetch(`/licenses/${rebindConfirm}/rebind-device`, {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            await fetch(`${API_URL}/licenses/${rebindConfirm}/rebind-device`, {
                 method: 'POST',
                 headers: {
                     ...AdminAuthService.getAuthHeader() as any,

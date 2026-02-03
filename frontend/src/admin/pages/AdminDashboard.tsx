@@ -15,15 +15,16 @@ export default function AdminDashboard() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
+                const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
                 const promises = [
-                    fetch('/licenses', { headers: AdminAuthService.getAuthHeader() })
+                    fetch(`${API_URL}/licenses`, { headers: AdminAuthService.getAuthHeader() })
                 ];
 
                 if (canViewAdmins) {
-                    promises.push(fetch('/admins', { headers: AdminAuthService.getAuthHeader() }));
+                    promises.push(fetch(`${API_URL}/admins`, { headers: AdminAuthService.getAuthHeader() }));
                 }
                 if (canViewLogs) {
-                    promises.push(fetch('/audit-logs', { headers: AdminAuthService.getAuthHeader() }));
+                    promises.push(fetch(`${API_URL}/audit-logs`, { headers: AdminAuthService.getAuthHeader() }));
                 }
 
                 const results = await Promise.all(promises);
