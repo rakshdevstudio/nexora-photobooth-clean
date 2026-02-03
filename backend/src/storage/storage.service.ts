@@ -4,27 +4,15 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 @Injectable()
 export class StorageService {
     private readonly logger = new Logger(StorageService.name);
-    private supabase: SupabaseClient;
+    private logger = new Logger(StorageService.name);
+    // private supabase: SupabaseClient; // Removed for network isolation
     private bucketName = process.env.SUPABASE_BUCKET || 'photos';
 
     constructor() {
-        // STRICT CONFIGURATION: Network Isolation & Server-Side Security
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-        if (!supabaseUrl || !supabaseKey) {
-            this.logger.error('CRITICAL: Supabase credentials missing (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY).');
-            // We log error but don't throw in constructor to allow app to boot (though functionality will break)
-        }
-
-        // Optimize for server-side usage: disable session persistence and auto-refresh
-        this.supabase = createClient(supabaseUrl || '', supabaseKey || '', {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-                detectSessionInUrl: false,
-            },
-        });
+        // STRICT ISOLATION: No Supabase Client on Backend
+        // const supabaseUrl = process.env.SUPABASE_URL;
+        // const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        this.logger.log('StorageService initialized (Frontend-only mode).');
     }
 
     // NOTE: OnModuleInit removed to prevent ANY network calls during startup.
