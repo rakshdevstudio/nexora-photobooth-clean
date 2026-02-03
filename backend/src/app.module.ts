@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { LicenseModule } from './license/license.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { StorageModule } from './storage/storage.module';
 
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
