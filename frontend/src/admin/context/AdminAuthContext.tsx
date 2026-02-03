@@ -18,7 +18,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchUserDetails = async (partialUser: AdminUser) => {
         try {
-            const res = await fetch('/admins', {
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+            const res = await fetch(`${API_URL}/admins`, {
                 headers: { 'Authorization': `Bearer ${AdminAuthService.getToken()}` }
             });
             if (res.ok) {

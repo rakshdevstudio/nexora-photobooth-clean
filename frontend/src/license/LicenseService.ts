@@ -39,7 +39,8 @@ export const LicenseService = {
     // 3. Validation Logic
     validateWithServer: async (licenseKey: string, fingerprint: string): Promise<boolean> => {
         try {
-            const API_URL = import.meta.env.VITE_API_URL || '';
+            // Fallback to hardcoded Railway URL if env var is missing
+            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
             const res = await fetch(`${API_URL}/licenses/validate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
