@@ -1,9 +1,10 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, OnModuleInit, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
-export class StorageService {
+export class StorageService implements OnModuleInit {
+    private readonly logger = new Logger(StorageService.name);
     private supabase: SupabaseClient;
     private bucketName = process.env.SUPABASE_BUCKET || 'photos';
 
@@ -12,10 +13,31 @@ export class StorageService {
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
         if (!supabaseUrl || !supabaseKey) {
-            console.warn('Supabase credentials not found in environment variables.');
+            this.logger.warn('Supabase credentials not found in environment variables.');
         }
 
         this.supabase = createClient(supabaseUrl || '', supabaseKey || '');
+    }
+
+    async onModuleInit() {
+        try {
+            this.logger.log('Validating Supabase connection...');
+            // Simple check: Try to list buckets (or just verify the client can reach the server)
+            // Even a simple listBuckets call will fail if the URL is invalid/unreachable.
+            const { error } = await this.supabase.storage.listBuckets();
+
+            if (error) {
+                // If it's a connection error (like ENOTFOUND), it will catch below usually, 
+                // but if Supabase returns an API error, we handle it here.
+                throw new Error(`Supabase API Error: ${error.message}`);
+            }
+
+            this.logger.log('Supabase connection validated successfully.');
+        } catch (error: any) {
+            this.logger.error(`Failed to connect to Supabase: ${error.message}`);
+            // Re-throw to prevent application startup if storage is critical
+            throw new InternalServerErrorException(`Supabase Connection Failed: ${error.message}`);
+        }
     }
 
     async uploadPhoto(file: Buffer, filename: string): Promise<string> {
