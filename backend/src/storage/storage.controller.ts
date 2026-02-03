@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, UseInterceptors, UploadedFile, BadRequestException, Body } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
 
@@ -11,16 +11,19 @@ export class StorageController {
         return 'Storage Module Active';
     }
 
+    @Post('signed-url')
+    async getSignedUrl(@Body() body: { path: string }) {
+        if (!body.path) {
+            throw new BadRequestException('Path is required');
+        }
+        return this.storageService.getSignedUploadUrl(body.path);
+    }
+
+    // DEPRECATED: Do not use. Frontend should use signed-url flow.
     @Post('upload')
     @UseInterceptors(FileInterceptor('file'))
     async uploadFile(@UploadedFile() file: any) {
-        console.log('Storage Upload Request Received');
-        if (!file) {
-            throw new BadRequestException('No file uploaded');
-        }
-
-        const url = await this.storageService.uploadPhoto(file.buffer, file.originalname);
-        console.log('Storage Generated URL:', url);
-        return { downloadUrl: url };
+        console.warn('Deprecated /storage/upload called. This endpoint is disabled.');
+        throw new BadRequestException('Backend uploads are disabled. Use /storage/signed-url and direct upload.');
     }
 }

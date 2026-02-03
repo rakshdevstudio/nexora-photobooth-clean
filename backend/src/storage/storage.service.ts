@@ -48,30 +48,38 @@ export class StorageService implements OnModuleInit {
         }
     }
 
-    async uploadPhoto(file: Buffer, filename: string): Promise<string> {
-        const path = `kiosk/${uuidv4()}-${filename}`;
-
-        const { error } = await this.supabase.storage
+    async getSignedUploadUrl(path: string): Promise<{ signedUrl: string; token: string; path: string; downloadUrl: string }> {
+        // The backend ONLY generates a signed URL. The frontend uploads the file directly.
+        // This bypasses Railway DNS issues completely.
+        const { data, error } = await this.supabase.storage
             .from(this.bucketName)
-            .upload(path, file, {
-                contentType: 'image/png',
-                upsert: false,
-            });
+            .createSignedUploadUrl(path);
 
         if (error) {
-            console.error('Supabase Upload Error:', error);
-            throw new InternalServerErrorException('Failed to upload photo');
+            this.logger.error(`Failed to generate signed upload URL: ${error.message}`);
+            throw new InternalServerErrorException('Failed to generate upload URL');
         }
 
-        const { data, error: signedUrlError } = await this.supabase.storage
+        // Generate a read-only signed URL for the frontend to display the QR code
+        const { data: readData, error: readError } = await this.supabase.storage
             .from(this.bucketName)
-            .createSignedUrl(path, 900);
+            .createSignedUrl(path, 3600); // 1 hour validity
 
-        if (signedUrlError) {
-            console.error('Signed URL Error:', signedUrlError);
-            throw new InternalServerErrorException('Failed to generate signed URL');
+        if (readError) {
+            this.logger.error(`Failed to generate signed read URL: ${readError.message}`);
+            // We don't fail the upload flow if read URL fails, but it's bad.
         }
 
-        return data.signedUrl;
+        return {
+            signedUrl: data.signedUrl,
+            token: data.token,
+            path: data.path,
+            downloadUrl: readData?.signedUrl || '',
+        };
+    }
+
+    // DEPRECATED: Direct backend uploads are removed to stabilize Railway production
+    async uploadPhoto(_file: Buffer, _filename: string): Promise<string> {
+        throw new InternalServerErrorException('Backend uploads are disabled. Use signed-url flow.');
     }
 }
