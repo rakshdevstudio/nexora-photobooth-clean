@@ -39,7 +39,8 @@ export const LicenseService = {
     // 3. Validation Logic
     validateWithServer: async (licenseKey: string, fingerprint: string): Promise<boolean> => {
         try {
-            const res = await fetch('/licenses/validate', {
+            const API_URL = import.meta.env.VITE_API_URL || '';
+            const res = await fetch(`${API_URL}/licenses/validate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ licenseKey, deviceFingerprint: fingerprint })
