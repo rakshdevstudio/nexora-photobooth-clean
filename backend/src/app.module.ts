@@ -6,10 +6,12 @@ import { BootstrapModule } from './bootstrap/bootstrap.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { LicenseModule } from './license/license.module';
-import { StorageModule } from './storage/storage.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
-  imports: [PrismaModule, BootstrapModule, AuthModule, AdminModule, LicenseModule, StorageModule],
+  imports: [PrismaModule, BootstrapModule, AuthModule, AdminModule, LicenseModule, StorageModule, MaintenanceModule, AuditLogsModule],
   controllers: [AppController],
   providers: [AppService],
 })
