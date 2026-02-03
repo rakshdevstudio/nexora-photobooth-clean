@@ -1,9 +1,10 @@
 import { AdminUser, AuthResponse } from '../types';
+import { API_URL } from '../../config';
 
 export class AdminAuthService {
     private static readonly TOKEN_KEY = 'nexora_super_admin_token';
-    // Use relative path for proxy locally, env var for prod, or hardcoded fallback
-    private static readonly API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+    // Use centralized configuration for API URL
+    private static readonly API_URL = API_URL;
 
     static getToken(): string | null {
         return localStorage.getItem(this.TOKEN_KEY);

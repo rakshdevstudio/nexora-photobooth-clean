@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { API_URL } from "../../config";
 import type {
   AdminSettings,
   BoothStepId,
@@ -453,7 +454,7 @@ export function BoothFlowProvider({ children }: { children: React.ReactNode }) {
       formData.append("file", blob, filename);
 
       console.log("Uploading photo...");
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+      const BACKEND_URL = API_URL;
 
       const res = await fetch(`${BACKEND_URL}/storage/upload`, {
         method: "POST",
