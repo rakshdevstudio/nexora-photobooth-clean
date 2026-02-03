@@ -4,7 +4,6 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 @Injectable()
 export class StorageService {
     private readonly logger = new Logger(StorageService.name);
-    private logger = new Logger(StorageService.name);
     // private supabase: SupabaseClient; // Removed for network isolation
     private bucketName = process.env.SUPABASE_BUCKET || 'photos';
 
