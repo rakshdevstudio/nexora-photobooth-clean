@@ -2,14 +2,17 @@ import { createClient } from "@supabase/supabase-js";
 
 // Use Vite env variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.warn("Supabase credentials missing in VITE env vars. Uploads involving Supabase will fail.");
+// 4. Verify at Runtime (Debug Step)
+console.log('SUPABASE URL:', supabaseUrl);
+
+if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase frontend environment variables');
 }
 
-export const supabase = createClient(supabaseUrl || "", supabaseKey || "", {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        persistSession: true, // Optional for this use case but standard for FE
+        persistSession: true,
     },
 });
