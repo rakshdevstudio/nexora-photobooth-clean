@@ -16,7 +16,14 @@ export class StorageService implements OnModuleInit {
             this.logger.warn('Supabase credentials not found in environment variables.');
         }
 
-        this.supabase = createClient(supabaseUrl || '', supabaseKey || '');
+        // Optimize for server-side usage: disable session persistence and auto-refresh
+        this.supabase = createClient(supabaseUrl || '', supabaseKey || '', {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false,
+            },
+        });
     }
 
     async onModuleInit() {
@@ -34,9 +41,10 @@ export class StorageService implements OnModuleInit {
 
             this.logger.log('Supabase connection validated successfully.');
         } catch (error: any) {
+            // SOFT VALIDATION: Log error but do NOT crash the app.
+            // This allows the app to start even if Supabase is temporarily unreachable.
             this.logger.error(`Failed to connect to Supabase: ${error.message}`);
-            // Re-throw to prevent application startup if storage is critical
-            throw new InternalServerErrorException(`Supabase Connection Failed: ${error.message}`);
+            this.logger.warn('Application starting without Supabase verification. Uploads may fail.');
         }
     }
 
