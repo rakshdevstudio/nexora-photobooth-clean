@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { API_URL } from "../../config";
+import { supabase } from "../../supabaseClient";
 import type {
   AdminSettings,
   BoothStepId,
@@ -445,123 +446,47 @@ export function BoothFlowProvider({ children }: { children: React.ReactNode }) {
 
   const uploadFinalPhoto = async (dataUrl: string) => {
     try {
-      console.log("Starting uploadFinalPhoto (Signed URL Flow)...");
+      console.log("Starting uploadFinalPhoto (Direct Supabase RLS Flow)...");
       const blob = await (await fetch(dataUrl)).blob();
-      // OrderDraft doesn't have an id, so we use paymentRef or a timestamp/random fallback
+
       const uniqueId = order.paymentRef || `draft-${Date.now()}`;
-      const filename = `kiosk/print-${uniqueId}.png`; // Prepend kiosk/ to match service path expectation if needed, or let service handle it. 
-      // Actually backend service expects path. Let's just send the desired path relative to bucket root.
-      // Current backend logic was: `kiosk/${uuidv4()}-${filename}`.
-      // We should replicate a similar path structure for consistency or just let backend sign whatever path we ask.
-      // Let's use a simple unique path.
-      const path = `kiosk/${nanoid()}-print.png`;
+      // Use a simple path structure.
+      const filename = `print-${uniqueId}-${nanoid()}.png`;
+      const path = `kiosk/${filename}`;
 
-      console.log("Requesting signed URL for path:", path);
-      const BACKEND_URL = API_URL;
+      console.log("Uploading directly to Supabase storage 'photos' bucket:", path);
 
-      // 1. Get Signed URL from Backend
-      const signedRes = await fetch(`${BACKEND_URL}/storage/signed-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path }),
-      });
+      // DIRECT UPLOAD via Supabase Client (RLS)
+      // Requires 'photos' bucket to be Public and have RLS policy allowing INSERT for anon/public.
+      const { data, error } = await supabase.storage
+        .from("photos")
+        .upload(path, blob, {
+          contentType: "image/png",
+          upsert: false,
+        });
 
-      if (!signedRes.ok) throw new Error("Failed to get signed URL: " + signedRes.statusText);
-      const { signedUrl, downloadUrl } = await signedRes.json();
-      console.log("Got signed URL. Uploading to Supabase...");
+      if (error) {
+        throw new Error("Supabase Direct Upload Failed: " + error.message);
+      }
 
-      // 2. Upload directly to Supabase
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "image/png",
-          // Supabase requires the Authorization header to match the token for this signed URL
-          // implicitly handled by the signed URL query params usually, but sometimes headers needed.
-          // The signed URL contains the token in query params. 
-          // We just need Content-Type.
-        },
-        body: blob,
-      });
+      console.log("Upload success. Data:", data);
 
-      if (!uploadRes.ok) throw new Error("Direct upload failed: " + uploadRes.statusText);
+      // Construct Public URL (Bucket must be public)
+      const { data: publicData } = supabase.storage
+        .from("photos")
+        .getPublicUrl(path);
 
-      // 3. Construct Public/Download URL
-      // Since it's a private bucket usually, we might need a signed download URL too?
-      // Or if it's public, we construct it.
-      // Wait, the previous backend logic returned `data.signedUrl` from `createSignedUrl(path, 900)`.
-      // The `signedUrl` we got above is for UPLOAD (PUT).
-      // We need a DOWNLOAD url (GET) to show the QR code.
-      // The backend `getSignedUploadUrl` returns `{ signedUrl, token, path }`.
-      // It DOES NOT return a download URL.
-      // We can assume the signedUrl is primarily for upload.
-      // We might need to ask backend for a download URL separately OR just use the text logic for now.
-      // Actually, standard Supabase `createSignedUploadUrl` returns a URL that works for PUT.
-      // WE NEED A WAY TO GET THE DOWNLOAD URL. 
-      // Current backend `uploadPhoto` returned a signed *GET* URL.
-      // We should update `getSignedUploadUrl` to ALSO return a view URL or we make another call.
-      // OR, we can just use the path we know and ask backend to sign it for viewing?
-
-      // Let's look at `StorageService`:
-      // It returns: `signedUrl: data.signedUrl` (from createSignedUploadUrl).
-
-      // PROPOSAL: Use the same `signedUrl` ?? No, that's for PUT.
-      // We need to modify backend to return a download URL as well or we can't show the QR code.
-      // Let's hotfix this: 
-      // The user wants "Backend: Add `getSignedUploadUrl`" ... 
-      // The previously approved plan said: "Returns { signedUrl, path }".
-      // It did NOT specify a download URL.
-      // However, the `uploadFinalPhoto` sets `order.downloadUrl`.
-      // If we don't have one, the QR code won't work.
-
-      // Let's assume for now we can't easily get a long-lived public URL if the bucket is private.
-      // But `createSignedUrl` was used before with 900s expiry.
-      // We should probably ask the backend for a download URL after upload, OR 
-      // Update `getSignedUploadUrl` to ALSO return a read URL.
-      // Since I can't easily change backend right this second without another step, 
-      // I will implement a valid workaround:
-      // constructing the public URL if public, or just using the path for now?
-      // No, that will break QR.
-
-      // BETTER PLAN: Update backend `getSignedUploadUrl` to ALSO generate a Read Signed URL.
-      // I will do that in the NEXT step. For now, let's implement the frontend flow 
-      // expecting `downloadUrl` to be present in the response (which I will add).
-
-      // Wait, `StorageService` logic I just wrote:
-      // return { signedUrl: data.signedUrl, token: data.token, path: data.path };
-
-      // I need to go back and fix `StorageService` to include `downloadUrl` (signed GET url).
-      // But I can't backtrack easily in this tool call.
-      // I will implement the frontend assuming the response will have it, 
-      // and then I will immediately apply a fix to the backend in the next turn.
-
-      console.log(`Upload success. Download URL: ${downloadUrl}`);
-
-      // !!! TEMPORARY ASSUMPTION: Backend will be updated to return `downloadUrl`
-      // If not, this is undefined.
-      // I'll add a TODO comment.
-
-      // Actually, usually `signedUrl` from `createSignedUploadUrl` is for PUT.
-      // We can try to use the `downloadUrl` property if I add it.
-
-      // Let's stick to the plan: "Frontend: Refactor `uploadPhoto`".
-      // I will implement the upload.
-      // I will rely on a subsequent backend fix to provide the download URL.
-
-      // Wait, I can just do a second fetch to `signed-url`? No that gives PUT url.
-      // I should update backend.
-
-      // For this step, I will implement the UPLOAD part.
+      const downloadUrl = publicData.publicUrl;
+      console.log(`Download URL: ${downloadUrl}`);
 
       setOrder((prev) => {
-        // We will momentarily likely fail to have a download URL until I fix backend.
-        // But the upload itself WILL work.
-        return { ...prev, downloadUrl: downloadUrl };
+        return { ...prev, downloadUrl };
       });
 
     } catch (err) {
       console.error("Failed to upload photo for QR:", err);
 
-      // Forced Mock for Dev/UI testing
+      // Forced Mock for Dev/UI testing if upload fails (e.g. misconfigured RLS)
       if (import.meta.env.DEV) {
         console.warn("DEV FALLBACK: Using mock URL.");
         const mockUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80";
