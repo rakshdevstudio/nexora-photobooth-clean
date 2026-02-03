@@ -30,33 +30,25 @@ export class StorageService {
     // NOTE: OnModuleInit removed to prevent ANY network calls during startup.
     // The backend should not attempt to connect to Supabase until a request is made.
 
-    async getSignedUploadUrl(path: string): Promise<{ signedUrl: string; token: string; path: string; downloadUrl: string }> {
+    async getSignedUploadUrl(path: string): Promise<{ signedUrl: string; path: string; downloadUrl: string }> {
         // The backend ONLY generates a signed URL. The frontend uploads the file directly.
         // This bypasses Railway DNS issues completely for the upload traffic.
+        // NOTE: We use `createSignedUrl` (offline signer) instead of `createSignedUploadUrl` (network bound)
+        // to ensure ZERO network calls from the backend. The token generated allows access to the path.
         const { data, error } = await this.supabase.storage
             .from(this.bucketName)
-            .createSignedUploadUrl(path);
+            .createSignedUrl(path, 3600); // 1 hour validity
 
         if (error) {
             this.logger.error(`Failed to generate signed upload URL: ${error.message}`);
             throw new InternalServerErrorException('Failed to generate upload URL');
         }
 
-        // Generate a read-only signed URL for the frontend to display the QR code
-        const { data: readData, error: readError } = await this.supabase.storage
-            .from(this.bucketName)
-            .createSignedUrl(path, 3600); // 1 hour validity
-
-        if (readError) {
-            this.logger.error(`Failed to generate signed read URL: ${readError.message}`);
-            // We don't fail the upload flow if read URL fails, but it's bad.
-        }
-
+        // We use the same URL for download (GET) and upload (PUT) as it grants access to the object.
         return {
             signedUrl: data.signedUrl,
-            token: data.token,
-            path: data.path,
-            downloadUrl: readData?.signedUrl || '',
+            path: path,
+            downloadUrl: data.signedUrl,
         };
     }
 
