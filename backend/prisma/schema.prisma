@@ -53,9 +53,7 @@ model License {
   expiresAt DateTime?
   isArchived Boolean      @default(false)
 
-  deviceId String? @unique
-  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  mismatchDetectedAt DateTime?
+  deviceId String? // Direct storage, no relation
 
   issuerId String
   issuer   User   @relation("Issuer", fields: [issuerId], references: [id])
@@ -69,8 +67,6 @@ model Device {
   fingerprint String  @unique
   name        String?
   isArchived  Boolean @default(false)
-
-  license License?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

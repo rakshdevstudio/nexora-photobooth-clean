@@ -45,12 +45,12 @@ export class LicenseService {
     async findAll(actorId: string, actorRole: Role) {
         if (actorRole === Role.SUPER_ADMIN) {
             return this.prisma.license.findMany({
-                include: { device: true, issuer: { select: { id: true, name: true, email: true } } },
+                include: { issuer: { select: { id: true, name: true, email: true } } },
             });
         } else {
             return this.prisma.license.findMany({
                 where: { issuerId: actorId },
-                include: { device: true, issuer: { select: { id: true, name: true, email: true } } },
+                include: { issuer: { select: { id: true, name: true, email: true } } },
             });
         }
     }
@@ -63,25 +63,14 @@ export class LicenseService {
             }
         }
 
-        const license = await this.prisma.license.findUnique({ where: { id }, include: { device: true } });
+        const license = await this.prisma.license.findUnique({ where: { id } });
         if (!license) throw new NotFoundException('License not found');
         if (license.status !== LicenseStatus.ACTIVE) throw new BadRequestException('License is not active');
         if (license.deviceId) throw new ConflictException('License already assigned');
 
-        let device = await this.prisma.device.findUnique({ where: { fingerprint: dto.fingerprint } });
-        if (!device) {
-            device = await this.prisma.device.create({
-                data: {
-                    fingerprint: dto.fingerprint,
-                    name: dto.deviceName,
-                },
-            });
-        }
-
         const updatedLicense = await this.prisma.license.update({
             where: { id },
-            data: { deviceId: device.id },
-            include: { device: true },
+            data: { deviceId: dto.deviceId },
         });
 
         await this.prisma.auditLog.create({
@@ -90,7 +79,7 @@ export class LicenseService {
                 entity: 'License',
                 entityId: license.id,
                 actorId,
-                details: { deviceId: device.id, fingerprint: device.fingerprint },
+                details: { deviceId: dto.deviceId },
             },
         });
 
@@ -130,7 +119,6 @@ export class LicenseService {
     async validateLicense(dto: ValidateLicenseDto) {
         const license = await this.prisma.license.findUnique({
             where: { key: dto.licenseKey },
-            include: { device: true },
         });
 
         if (!license) {
@@ -145,91 +133,43 @@ export class LicenseService {
             throw new ForbiddenException('License expired');
         }
 
-        // Device Validation Logic
-        if (license.device) {
-            // 1. Check strict match
-            if (license.device.fingerprint === dto.deviceFingerprint) {
-                // If we recovered from a mismatch (switched back to valid device), clear the warning?
-                if (license.mismatchDetectedAt) {
-                    await this.prisma.license.update({
-                        where: { id: license.id },
-                        data: { mismatchDetectedAt: null }
-                    });
-                }
+        // Strict Device Binding Logic
+        if (license.deviceId) {
+            // License already bound to a device
+            if (license.deviceId === dto.deviceId) {
+                // Same device - allow
                 return { valid: true, licenseId: license.id, expiresAt: license.expiresAt };
-            }
-
-            // 2. Mismatch Case - GRACE PERIOD LOGIC
-            const now = new Date();
-            let mismatchStart = license.mismatchDetectedAt;
-
-            if (!mismatchStart) {
-                // Start Grace Period
-                mismatchStart = now;
-                await this.prisma.license.update({
-                    where: { id: license.id },
-                    data: { mismatchDetectedAt: mismatchStart }
-                });
-            }
-
-            const diffTime = Math.abs(now.getTime() - mismatchStart.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            const GRACE_DAYS = 7;
-            const isGrace = diffDays <= GRACE_DAYS;
-
-            // Log Mismatch in Audit Log
-            await this.prisma.auditLog.create({
-                data: {
-                    action: isGrace ? 'LICENSE_MISMATCH_GRACE' : 'LICENSE_MISMATCH_BLOCKED',
-                    entity: 'License',
-                    entityId: license.id,
-                    actorId: license.issuerId,
-                    details: {
-                        expected: license.device.fingerprint,
-                        received: dto.deviceFingerprint,
-                        graceDay: diffDays,
-                        allowed: isGrace
-                    },
-                },
-            });
-
-            if (isGrace) {
-                // Soft Fail / Warn
-                // We return valid but maybe we should flag it? 
-                // The frontend expects { valid: boolean }.
-                console.warn(`License mismatch allowed (Day ${diffDays}/${GRACE_DAYS})`);
-                return { valid: true, licenseId: license.id, expiresAt: license.expiresAt, warning: 'Device Mismatch - Grace Period' };
             } else {
-                // Hard Lock
-                throw new ForbiddenException('DEVICE_MISMATCH');
+                // Different device - reject immediately
+                await this.prisma.auditLog.create({
+                    data: {
+                        action: 'LICENSE_DEVICE_MISMATCH',
+                        entity: 'License',
+                        entityId: license.id,
+                        actorId: license.issuerId,
+                        details: {
+                            expectedDeviceId: license.deviceId,
+                            receivedDeviceId: dto.deviceId,
+                        },
+                    },
+                });
+                throw new ForbiddenException('License already activated on another device');
             }
         } else {
-            // 3. First time Bind
-            let device = await this.prisma.device.findUnique({ where: { fingerprint: dto.deviceFingerprint } });
-
-            if (!device) {
-                device = await this.prisma.device.create({
-                    data: {
-                        fingerprint: dto.deviceFingerprint,
-                        name: `Device-${dto.deviceFingerprint.substring(0, 6)}`
-                    }
-                });
-            }
-
+            // First-time binding
             await this.prisma.license.update({
                 where: { id: license.id },
-                data: { deviceId: device.id }
+                data: { deviceId: dto.deviceId },
             });
 
             await this.prisma.auditLog.create({
                 data: {
-                    action: 'LICENSE_BOUND',
+                    action: 'LICENSE_DEVICE_BOUND',
                     entity: 'License',
                     entityId: license.id,
                     actorId: license.issuerId,
                     details: {
-                        deviceId: device.id,
-                        fingerprint: device.fingerprint
+                        deviceId: dto.deviceId,
                     },
                 },
             });
@@ -246,21 +186,21 @@ export class LicenseService {
         const license = await this.prisma.license.findUnique({ where: { id } });
         if (!license) throw new NotFoundException('License not found');
 
+        const previousDeviceId = license.deviceId;
+
         await this.prisma.license.update({
             where: { id },
-            data: {
-                deviceId: null,
-                mismatchDetectedAt: null
-            }
+            data: { deviceId: null }
         });
 
         await this.prisma.auditLog.create({
             data: {
-                action: 'LICENSE_REBOUND',
+                action: 'LICENSE_DEVICE_REBOUND',
                 entity: 'License',
                 entityId: license.id,
                 actorId,
                 details: {
+                    previousDeviceId,
                     message: 'Device binding cleared by admin'
                 },
             },

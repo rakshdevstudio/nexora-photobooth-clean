@@ -9,7 +9,7 @@ export class CreateLicenseDto {
 export class AssignLicenseDto {
     @IsString()
     @IsNotEmpty()
-    fingerprint: string;
+    deviceId: string;
 
     @IsString()
     @IsOptional()
@@ -23,5 +23,5 @@ export class ValidateLicenseDto {
 
     @IsString()
     @IsNotEmpty()
-    deviceFingerprint: string;
+    deviceId: string;
 }

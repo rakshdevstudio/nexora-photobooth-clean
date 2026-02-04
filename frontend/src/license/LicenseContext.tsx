@@ -12,9 +12,9 @@ interface LicenseContextType {
 const LicenseContext = createContext<LicenseContextType | null>(null);
 
 export function LicenseProvider({ children }: { children: React.ReactNode }) {
-    const [state, setState] = useState<LicenseState>('ACTIVATING'); // Start with validating
+    const [state, setState] = useState<LicenseState>('ACTIVATING');
 
-    // Core Validation Loop
+    // Core Validation Loop (Strict - No Grace Period)
     const validate = async () => {
         const stored = LicenseService.getStoredLicense();
         if (!stored) {
@@ -23,43 +23,31 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            // Check Server
-            const isValid = await LicenseService.validateWithServer(stored.key, stored.fingerprint);
-
+            const isValid = await LicenseService.validateWithServer(stored.key, stored.deviceId);
             if (isValid) {
-                // Update local timestamp
                 LicenseService.saveLicense({ ...stored, lastValidated: new Date().toISOString() });
                 setState('ACTIVE');
             } else {
                 setState('LOCKED');
             }
         } catch (e) {
-            // Offline Grace Check
-            if (LicenseService.isWithinGracePeriod(stored.lastValidated)) {
-                setState('ACTIVE'); // Grace mode
-            } else {
-                setState('LOCKED'); // Grace expired
-            }
+            // Network error = locked (no grace period)
+            setState('LOCKED');
         }
     };
 
     useEffect(() => {
         validate();
-        // Optional: Periodic revalidation can be added here
     }, []);
 
     const handleActivationSuccess = () => {
-        validate(); // Re-run validation to transition state
+        validate();
     };
 
     if (state === 'ACTIVATING' && !LicenseService.getStoredLicense()) {
-        // Tiny optimization: if no local license, strictly Unlicensed immediately
-        // But sticking to logic: useEffect will catch it fast.
-        // Showing nothing or splash while booting
         return <div className="fixed inset-0 bg-black flex items-center justify-center text-white"><Loader2 className="animate-spin h-8 w-8" /></div>;
     }
 
-    // Intercept View
     if (state === 'UNLICENSED') {
         return <ActivationScreen onSuccess={handleActivationSuccess} />;
     }
@@ -68,9 +56,6 @@ export function LicenseProvider({ children }: { children: React.ReactNode }) {
         return <LockedScreen onRetry={validate} />;
     }
 
-    // State is ACTIVATING (with stored license) or ACTIVE
-    // If ACTIVATING but we have stored license, we might want to show a spinner or just let the app load underneath?
-    // Better to block until confirmed ACTIVE for security, preventing flashes of UI.
     if (state === 'ACTIVATING') {
         return <div className="fixed inset-0 bg-black flex items-center justify-center text-white"><Loader2 className="animate-spin h-8 w-8" /></div>;
     }

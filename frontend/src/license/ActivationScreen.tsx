@@ -18,13 +18,13 @@ export default function ActivationScreen({ onSuccess }: Props) {
         setLoading(true);
 
         try {
-            const fingerprint = await LicenseService.getDeviceFingerprint();
-            const valid = await LicenseService.validateWithServer(key, fingerprint);
+            const deviceId = await LicenseService.getDeviceId();
+            const valid = await LicenseService.validateWithServer(key, deviceId);
 
             if (valid) {
                 LicenseService.saveLicense({
                     key,
-                    fingerprint,
+                    deviceId,
                     lastValidated: new Date().toISOString()
                 });
                 toast.success('Device Activation Successful');
@@ -70,7 +70,7 @@ export default function ActivationScreen({ onSuccess }: Props) {
                 </div>
 
                 <p className="text-xs text-gray-700">
-                    Device ID: <span className="font-mono">{localStorage.getItem('device_fingerprint') || '...'}</span>
+                    Device ID: <span className="font-mono">{localStorage.getItem('kiosk_device_id') || '...'}</span>
                 </p>
             </div>
         </div>

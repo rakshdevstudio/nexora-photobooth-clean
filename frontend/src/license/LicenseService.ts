@@ -1,21 +1,19 @@
 import { DeviceService } from './DeviceService';
-import { toast } from 'sonner';
 
 export type LicenseState = 'UNLICENSED' | 'ACTIVATING' | 'ACTIVE' | 'LOCKED';
 
 interface LicenseData {
     key: string;
-    fingerprint: string;
+    deviceId: string;
     lastValidated: string; // ISO Date
 }
 
 const STORAGE_KEY = 'kiosk_license_data';
-const GRACE_PERIOD_HOURS = 24;
 
 export const LicenseService = {
-    // 1. Device Fingerprinting
-    getDeviceFingerprint: async (): Promise<string> => {
-        return DeviceService.getFingerprint();
+    // 1. Device ID Management
+    getDeviceId: async (): Promise<string> => {
+        return DeviceService.getDeviceId();
     },
 
     // 2. Local Storage Management
@@ -36,34 +34,20 @@ export const LicenseService = {
         localStorage.removeItem(STORAGE_KEY);
     },
 
-    // 3. Validation Logic
-    validateWithServer: async (licenseKey: string, fingerprint: string): Promise<boolean> => {
-        try {
-            // Fallback to hardcoded Railway URL if env var is missing
-            const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
-            const res = await fetch(`${API_URL}/licenses/validate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ licenseKey, deviceFingerprint: fingerprint })
-            });
+    // 3. Validation Logic (Strict - No Grace Period)
+    validateWithServer: async (licenseKey: string, deviceId: string): Promise<boolean> => {
+        const API_URL = import.meta.env.VITE_API_URL || 'https://nexora-photobooth-clean-production.up.railway.app';
+        const res = await fetch(`${API_URL}/licenses/validate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ licenseKey, deviceId })
+        });
 
-            if (!res.ok) {
-                if (res.status === 403 || res.status === 404) return false; // Hard fail
-                throw new Error('Network error'); // Soft fail
-            }
-
-            const data = await res.json();
-            return data.valid;
-        } catch (e) {
-            throw e; // Let caller handle soft fails (offline)
+        if (!res.ok) {
+            return false; // All failures are hard failures
         }
-    },
 
-    // 4. offline Grace Check
-    isWithinGracePeriod: (lastValidated: string): boolean => {
-        const last = new Date(lastValidated).getTime();
-        const now = new Date().getTime();
-        const hoursDiff = (now - last) / (1000 * 60 * 60);
-        return hoursDiff < GRACE_PERIOD_HOURS;
+        const data = await res.json();
+        return data.valid;
     }
 };
