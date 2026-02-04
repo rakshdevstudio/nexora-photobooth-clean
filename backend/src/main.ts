@@ -7,11 +7,13 @@ async function bootstrap() {
     origin: [
       'http://localhost:5173',
       'http://localhost:8080',
+      /^https:\/\/.*\.vercel\.app$/,  // Allow all Vercel deployments
       'https://nexora-photobooth-clean.vercel.app',
       'https://nexora-photobooth-clean-production.up.railway.app'
     ],
-    methods: 'GET,POST,PUT,DELETE,OPTIONS',
+    methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: 'Content-Type,Authorization',
   });
   await app.listen(process.env.PORT ?? 3000);
 }
